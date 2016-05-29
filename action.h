@@ -35,6 +35,13 @@ typedef struct{
 	char man_p;
 	char nil_box_p;
 	char box_p;
+
+	char wall_g;
+	char empty_g;
+	char man_g;
+	char nil_box_g;
+	char box_g;
+
 }MAPELE;
 
 extern char GT[500][MAPSIZE][MAPSIZE];

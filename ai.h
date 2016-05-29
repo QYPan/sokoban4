@@ -6,7 +6,7 @@
 #define HASH_SIZE 2379689
 #define MAX(x, y) ((x)>(y)?(x):(y))
 #define MIN(x, y) ((x)<(y)?(x):(y))
-#define ABS(x) ((x)<0?(-x):(x))
+#define ABS(x) ((x)<0?(-(x)):(x))
 
 typedef long long LL;
 

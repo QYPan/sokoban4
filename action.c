@@ -83,6 +83,13 @@ void init_data(MAPELE *mele)
 	mele->man_p = '*';
 	mele->nil_box_p = 'O';
 	mele->box_p = 'O';
+
+	mele->wall_g = '#';
+	mele->empty_g = ' ';
+	mele->man_g = '*';
+	mele->nil_box_g = 'O';
+	mele->box_g = '@';
+
 }
 
 int judge_end(MAPELE *mele)

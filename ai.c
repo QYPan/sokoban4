@@ -18,8 +18,6 @@ int gc[] = {0, 0, -1, 1};
 MAPELE *mele;
 WINDOW *cur_win;
 double use_time;
-clock_t beg_time;
-clock_t end_time;
 Count co;
 
 void init_time()
@@ -60,7 +58,7 @@ int H(State *st)
 		int dis = inf;
 		for(r = 0; r < mele->row; r++){
 			for(c = 0; c < mele->col; c++){
-				if(NIL_BOX[r][c] == mele->nil_box_p && !vis[r][c]){
+				if(NIL_BOX[r][c] == mele->nil_box_g && !vis[r][c]){
 					int br = st->bcoor[cnt].r;
 					int bc = st->bcoor[cnt].c;
 					int d = ABS(br-r)+ABS(bc-c); 
@@ -87,13 +85,13 @@ State *new_state(char g[][MAPSIZE])
 	for(r = 0; r < mele->row; r++){
 		for(c = 0; c < mele->col; c++){
 			st->m[r][c] = g[r][c];
-			if(g[r][c] == mele->box_p){
+			if(g[r][c] == mele->box_g){
 				st->mark_val ^= mark[0][r][c];
 				st->bcoor[u].r = r;
 				st->bcoor[u].c = c;
 				u++;
 			}
-			if(g[r][c] == mele->man_p){
+			if(g[r][c] == mele->man_g){
 				st->man_r = r;
 				st->man_c = c;
 			}
@@ -111,7 +109,7 @@ int go_there(State *st, int mr, int mc, int er, int ec)
 	int col = mele->col;
 	int len[MAPSIZE*MAPSIZE];
 	int vis[MAPSIZE*MAPSIZE];
-	int mque[1000];
+	int mque[10000];
 	memset(vis, 0, sizeof(vis));
 	memset(len, 0, sizeof(len));
 	mque[f] = mr * col + mc;
@@ -127,7 +125,7 @@ int go_there(State *st, int mr, int mc, int er, int ec)
 			int nr = jr + gr[i];
 			int nc = jc + gc[i];
 			int np = nr * col + nc;
-			if(st->m[nr][nc] != mele->wall_p && st->m[nr][nc] != mele->box_p && !vis[np]){
+			if(st->m[nr][nc] != mele->wall_g && st->m[nr][nc] != mele->box_g && !vis[np]){
 				vis[np] = 1;
 				len[np] = len[p] + 1;
 				mque[r++] = np;
@@ -158,7 +156,7 @@ State *get_end_state()
 	end_st->mark_val = 0;
 	for(r = 0; r < mele->row; r++){
 		for(c = 0; c < mele->col; c++){
-			if(NIL_BOX[r][c] == mele->nil_box_p){
+			if(NIL_BOX[r][c] == mele->nil_box_g){
 				end_st->mark_val ^= mark[0][r][c];
 				end_st->bcoor[u].r = r;
 				end_st->bcoor[u].c = c;
@@ -177,19 +175,28 @@ void clear_sub_hash(Hashele *ht)
 	free(ht);
 }
 
+void init_hash()
+{
+	int i;
+	for(i = 0; i < HASH_SIZE; i++){
+		hashtable[i] = NULL;
+	}
+}
+
 void clear_hash()
 {
 	int i;
 	for(i = 0; i < HASH_SIZE; i++){
 		if(hashtable[i] != NULL){
 			clear_sub_hash(hashtable[i]);
+			hashtable[i] = NULL;
 		}
 	}
 }
 
 void init_tools()
 {
-	clear_hash();
+	init_hash();
 	init_time();
 	build_zobrist_board();
 	co.state_count = 0;
@@ -281,14 +288,14 @@ State *try_move(State *fa, Coor *coor, int d1, int d2)
 	int cr = fa->man_r;
 	int cc = fa->man_c;
 	int golen;
-	State *p;
+	State *p = NULL;
 	golen = go_there(fa, fa->man_r, fa->man_c, br-d1, bc-d2);
 	if(golen >= 0){
-		if(fa->m[br+d1][bc+d2] != mele->wall_p && fa->m[br+d1][bc+d2] != mele->box_p){
+		if(fa->m[br+d1][bc+d2] != mele->wall_g && fa->m[br+d1][bc+d2] != mele->box_g){
 			/* !!!!!!!!!!!!!!!!!! */
-			fa->m[br][bc] = mele->man_p;
-			fa->m[cr][cc] = mele->empty_p;
-			fa->m[br+d1][bc+d2] = mele->box_p;
+			fa->m[br][bc] = mele->man_g;
+			fa->m[cr][cc] = mele->empty_g;
+			fa->m[br+d1][bc+d2] = mele->box_g;
 			p = new_state(fa->m);
 			p->fa = fa;
 			p->man_r = br;
@@ -298,13 +305,15 @@ State *try_move(State *fa, Coor *coor, int d1, int d2)
 			p->move = fa->move + golen + 1;
 			p->g = fa->g + 1;
 			p->f = (p->g) + (p->h);
+#if 0
 			if(!try_insert(p)){
 				free(p);
 				return NULL;
 			}
-			fa->m[br][bc] = mele->box_p;
-			fa->m[br+d1][bc+d2] = mele->empty_p;
-			fa->m[cr][cc] = mele->man_p;
+#endif
+			fa->m[br][bc] = mele->box_g;
+			fa->m[br+d1][bc+d2] = mele->empty_g;
+			fa->m[cr][cc] = mele->man_g;
 		}
 	}
 	return p;
@@ -325,7 +334,7 @@ void man_real_go(int r, int c, int mfa[][MAPSIZE], int dir[][MAPSIZE])
 			case 3: d1 = 0; d2 = 1; break;
 		}
 		usleep(200*1000);
-		move_it(cur_win, mele, mele->man_p, cr, cc, d1, d2);
+		move_it(cur_win, mele, mele->man_g, cr, cc, d1, d2);
 	}
 }
 
@@ -360,7 +369,7 @@ void man_go(State *pp, int er, int ec)
 			int nr = jr + gr[i];
 			int nc = jc + gc[i];
 			int np = nr * col + nc;
-			if(pp->m[nr][nc] != mele->wall_p && pp->m[nr][nc] != mele->box_p && !vis[np]){
+			if(pp->m[nr][nc] != mele->wall_g && pp->m[nr][nc] != mele->box_g && !vis[np]){
 				vis[np] = 1;
 				mque[r++] = np;
 				mfa[nr][nc] = p;
@@ -379,16 +388,16 @@ void print_ans(State *p, State *sub)
 	if(p->fa == NULL){
 		man_go(p, sub->man_r-d1, sub->man_c-d2);
 		usleep(500*1000);
-		move_it(cur_win, mele, mele->box_p, sub->man_r, sub->man_c, d1, d2);
-		move_it(cur_win, mele, mele->man_p, sub->man_r-d1, sub->man_c-d2, d1, d2);
+		move_it(cur_win, mele, mele->box_g, sub->man_r, sub->man_c, d1, d2);
+		move_it(cur_win, mele, mele->man_g, sub->man_r-d1, sub->man_c-d2, d1, d2);
 		return;
 	}
 
 	print_ans(p->fa, p);
 	man_go(p, sub->man_r-d1, sub->man_c-d2);
 	usleep(500*1000);
-	move_it(cur_win, mele, mele->box_p, sub->man_r, sub->man_c, d1, d2);
-	move_it(cur_win, mele, mele->man_p, sub->man_r-d1, sub->man_c-d2, d1, d2);
+	move_it(cur_win, mele, mele->box_g, sub->man_r, sub->man_c, d1, d2);
+	move_it(cur_win, mele, mele->man_g, sub->man_r-d1, sub->man_c-d2, d1, d2);
 }
 
 void print_count(WINDOW *win_ptr, State *st)
@@ -399,7 +408,7 @@ void print_count(WINDOW *win_ptr, State *st)
 	mvwprintw(win_ptr, n++, 0, "hit:  %d", co.hit_count);
 	mvwprintw(win_ptr, n++, 0, "same: %d", co.same_count);
 	mvwprintw(win_ptr, n++, 0, "time: %.2lf s", use_time);
-	mvwprintw(win_ptr, n++, 0, "push: %d", st->h);
+	mvwprintw(win_ptr, n++, 0, "push: %d", st->g);
 	mvwprintw(win_ptr, n++, 0, "move: %d", st->move);
 	mvwprintw(win_ptr, n++, 0, "len:  %d", co.sac);
 	wrefresh(win_ptr);
@@ -408,6 +417,11 @@ void print_count(WINDOW *win_ptr, State *st)
 State *DFS(State *cur_st, State *end_st, int depth)
 {
 	int cnt;
+#if 0
+	mvwprintw(cur_win, 0, 0, "(%d, %d)", cur_st->bcoor[0].r, cur_st->bcoor[0].c);
+	wrefresh(cur_win);
+	sleep(3);
+#endif
 	if(cur_st->mark_val == end_st->mark_val){
 		return cur_st;
 	}
@@ -424,9 +438,9 @@ State *DFS(State *cur_st, State *end_st, int depth)
 			if(st != NULL){
 				State *ans = DFS(st, end_st, depth);
 				if(ans != NULL){
-					free(st);
 					return ans;
 				}
+				free(st);
 			}
 		}
 	}
@@ -437,6 +451,8 @@ void *IDA_star(void *arg)
 {
 	Thread_arg targ = *(Thread_arg *)arg;
 	WINDOW *count_win = targ.win_ptr;
+	clock_t beg_time;
+	clock_t end_time;
 	beg_time = clock();
 	State *beg_st = targ.beg_st;
 	State *end_st = targ.end_st;
@@ -457,11 +473,14 @@ void *IDA_star(void *arg)
 		exit(EXIT_FAILURE);
 	}
 	depth = beg_st->h - 1;
+	ans = NULL;
 	while(ans == NULL){
 		depth += 1;
 		clear_hash();
 		ans = DFS(beg_st, end_st, depth);
 	}
+	end_time = clock();
+	use_time = (double)(end_time - beg_time) / CLOCKS_PER_SEC;
 	print_count(count_win, ans);
 	print_ans(ans->fa, ans);
 	pthread_exit(NULL);
@@ -486,13 +505,12 @@ void computer_play(WINDOW *win_ptr, MAPELE *mapele)
 	end_st = get_end_state();
 	beg_st = new_state(BOX);
 
+
 	arg.win_ptr = count_win;
 	arg.beg_st = beg_st;
 	arg.end_st = end_st;
 	res = pthread_create(&IDA_star_thread, NULL, IDA_star, (void *)&arg);
 	if(res != 0){
-		free(beg_st);
-		free(end_st);
 		fprintf(stderr, "A_star thread creation failed.\n");
 	}
 

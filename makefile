@@ -1,7 +1,7 @@
 obj = face.o action.o main.o ai.o
 
 bm : $(obj)	
-	gcc -o bm $(obj) -lcurses -lpthread
+	gcc -o bm $(obj) -lcurses -lpthread -g
 face.o : face.c face.h action.h
 	gcc -c -Wall face.c
 ai.o : ai.c face.h action.h
