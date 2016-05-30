@@ -53,6 +53,7 @@ int H(State *st)
 	int r, c;
 	int total_dis = 0;
 	int vis[MAPSIZE][MAPSIZE];
+	memset(vis, 0, sizeof(vis));
 	for(cnt = 0; cnt < mele->box_count; cnt++){
 		Coor tco;
 		int dis = inf;
@@ -63,11 +64,13 @@ int H(State *st)
 					int bc = st->bcoor[cnt].c;
 					int d = ABS(br-r)+ABS(bc-c); 
 					if(d < dis){
-						dis = d;
 						vis[r][c] = 1;
-						vis[tco.r][tco.c] = 0;
+						if(dis != inf){
+							vis[tco.r][tco.c] = 0;
+						}
 						tco.r = r;
 						tco.c = c;
+						dis = d;
 					}
 				}
 			}
@@ -99,6 +102,7 @@ State *new_state(char g[][MAPSIZE])
 	}
 	st->g = st->move = 0;
 	st->f = st->h = H(st);
+	st->fa = NULL;
 	return st;
 }
 
@@ -201,7 +205,9 @@ void init_tools()
 	build_zobrist_board();
 	co.state_count = 0;
 	co.hit_count = 0;
+	co.hash_count = 0;
 	co.same_count = 0;
+	co.depth = 0;
 	co.sac = 0;
 }
 
@@ -239,13 +245,13 @@ int try_match(Hashele *ht, State *st)
 			co.same_count++;
 			return 1;
 		}
-		if(htmp->key == st->mark_val)
+		if(htmp->key != st->mark_val)
 			mat = 1;
+		c++;
 		if(htmp->next == NULL){
 			break;
 		}
 		htmp = htmp->next;
-		c++;
 	}
 	new_ht = (Hashele *)malloc(sizeof(Hashele));
 	new_ht->key = st->mark_val;
@@ -253,7 +259,7 @@ int try_match(Hashele *ht, State *st)
 	new_ht->mc = st->man_c;
 	new_ht->next = NULL;
 	htmp->next = new_ht;
-	if(!mat) co.hit_count++;
+	if(mat) co.hit_count++;
 	if(c > co.sac) co.sac = c;
 	return 0;
 }
@@ -270,6 +276,7 @@ int find_hash(State *st, int val)
 	new_ele->mc = st->man_c;
 	new_ele->next = NULL;
 	hashtable[ins] = new_ele;
+	co.hash_count++;
 	return 0;
 }
 
@@ -305,12 +312,13 @@ State *try_move(State *fa, Coor *coor, int d1, int d2)
 			p->move = fa->move + golen + 1;
 			p->g = fa->g + 1;
 			p->f = (p->g) + (p->h);
-#if 0
 			if(!try_insert(p)){
 				free(p);
-				return NULL;
+				p = NULL;
 			}
-#endif
+			else{
+				co.state_count++;
+			}
 			fa->m[br][bc] = mele->box_g;
 			fa->m[br+d1][bc+d2] = mele->empty_g;
 			fa->m[cr][cc] = mele->man_g;
@@ -405,9 +413,11 @@ void print_count(WINDOW *win_ptr, State *st)
 	int n = 0;
 	chose_color(win_ptr, 1);
 	mvwprintw(win_ptr, n++, 0, "stat: %d", co.state_count);
+	mvwprintw(win_ptr, n++, 0, "hash: %d", co.hash_count);
 	mvwprintw(win_ptr, n++, 0, "hit:  %d", co.hit_count);
 	mvwprintw(win_ptr, n++, 0, "same: %d", co.same_count);
 	mvwprintw(win_ptr, n++, 0, "time: %.2lf s", use_time);
+	mvwprintw(win_ptr, n++, 0, "deep: %d", co.depth);
 	mvwprintw(win_ptr, n++, 0, "push: %d", st->g);
 	mvwprintw(win_ptr, n++, 0, "move: %d", st->move);
 	mvwprintw(win_ptr, n++, 0, "len:  %d", co.sac);
@@ -417,11 +427,6 @@ void print_count(WINDOW *win_ptr, State *st)
 State *DFS(State *cur_st, State *end_st, int depth)
 {
 	int cnt;
-#if 0
-	mvwprintw(cur_win, 0, 0, "(%d, %d)", cur_st->bcoor[0].r, cur_st->bcoor[0].c);
-	wrefresh(cur_win);
-	sleep(3);
-#endif
 	if(cur_st->mark_val == end_st->mark_val){
 		return cur_st;
 	}
@@ -472,20 +477,43 @@ void *IDA_star(void *arg)
 		fprintf(stderr, "thread pthread_setcanceltype failed\n");
 		exit(EXIT_FAILURE);
 	}
-	depth = beg_st->h - 1;
+	depth = beg_st->h -1;
 	ans = NULL;
 	while(ans == NULL){
 		depth += 1;
 		clear_hash();
+		co.depth++;
+		co.state_count = 0;
+		co.same_count = 0;
+		co.hit_count = 0;
+		co.hash_count = 0;
+		co.sac = 0;
 		ans = DFS(beg_st, end_st, depth);
 	}
 	end_time = clock();
 	use_time = (double)(end_time - beg_time) / CLOCKS_PER_SEC;
-	print_count(count_win, ans);
-	print_ans(ans->fa, ans);
+
+	end_st->man_r = ans->man_r;
+	end_st->man_c = ans->man_c;
+	end_st->d1 = ans->d1;
+	end_st->d2 = ans->d2;
+	end_st->fa = ans->fa;
+	end_st->g = ans->g;
+	end_st->move = ans->move;
+	free(ans);
+
+	print_count(count_win, end_st);
+	print_ans(end_st->fa, end_st);
 	pthread_exit(NULL);
 }
 
+void free_way(State *st)
+{
+	if(st == NULL)
+		return;
+	free_way(st->fa);
+	free(st);
+}
 
 void computer_play(WINDOW *win_ptr, MAPELE *mapele)
 {
@@ -531,7 +559,7 @@ void computer_play(WINDOW *win_ptr, MAPELE *mapele)
 	}
 
 	clear_hash();
-	free(end_st);
+	free_way(end_st);
 
 	wclear(count_win);
 	wrefresh(count_win);

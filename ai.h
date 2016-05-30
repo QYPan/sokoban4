@@ -39,9 +39,9 @@ typedef struct{
 typedef struct{
 	int state_count;
 	int hit_count;
+	int hash_count;
 	int same_count;
-	int push_box_count;
-	int move_count;
+	int depth;
 	int sac;
 }Count;
 
