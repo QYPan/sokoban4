@@ -14,6 +14,13 @@ Hashele *hashtable[HASH_SIZE];
 LL mark[2][MAPSIZE][MAPSIZE];
 int gr[] = {-1, 1, 0, 0};
 int gc[] = {0, 0, -1, 1};
+int m[N][N];
+int lx[N];
+int ly[N];
+int vx[N];
+int vy[N];
+int slack[N];
+int mylink[N];
 
 MAPELE *mele;
 WINDOW *cur_win;
@@ -52,6 +59,95 @@ int state_cmp(const void *_s1, const void *_s2)
 	State **s1 = (State **)_s1;
 	State **s2 = (State **)_s2;
 	return (*s1)->f - (*s2)->f;
+}
+
+int dfs(int u)  
+{  
+	int v;
+	vx[u] = 1;
+    for(v = 0; v < mele->box_count; v++){  
+		if(!vy[v]){
+			int t = lx[u] + ly[v] - m[u][v];
+			if(!t){
+				vy[v] = 1;
+				if(mylink[v] == -1 || dfs(mylink[v])){  
+					mylink[v] = u;  
+					return 1;  
+				}  
+			}
+			else
+				if(t < slack[v])
+					slack[v] = t;
+		}
+    }  
+    return 0;  
+}  
+
+int km()
+{
+	
+	int i, j;
+	int ans = 0;
+	int bcout = mele->box_count;
+	memset(mylink, -1, sizeof(mylink));
+	for(i = 0; i < bcout; i++){
+		while(1){
+			int d = inf;
+			for(j = 0; j < bcout; j++){
+				slack[j] = inf;
+			}
+			memset(vx, 0, sizeof(vx));
+			memset(vy, 0, sizeof(vy));
+			if(dfs(i))
+				break;
+			for(j = 0; j < bcout; j++){
+				if(!vy[j] && slack[j] < d)
+					d = slack[j];
+			}
+			for(j = 0; j < bcout; j++){
+				if(vx[j])
+					lx[j] -= d;
+			}
+			for(j = 0; j < bcout; j++){
+				if(vy[j])
+					ly[j] += d;
+				else 
+					slack[j] -= d;
+			}
+		}
+	}
+	for(i = 0; i < bcout; i++)
+		ans += m[mylink[i]][i];
+	return ans;
+}
+
+int H1(State *st)
+{
+	int r, c;
+	int cnt1, cnt2;
+	int dis = 0;
+	int nil_c = 0;
+	Coor nil_bps[100];
+	for(r = 0; r < mele->row; r++){
+		for(c = 0; c < mele->col; c++){
+			if(NIL_BOX[r][c] == mele->nil_box_g){
+				nil_bps[nil_c].r = r;
+				nil_bps[nil_c].c = c;
+				nil_c++;
+			}
+		}
+	}
+	for(cnt1 = 0; cnt1 < mele->box_count; cnt1++){
+		for(cnt2 = 0; cnt2 < nil_c; cnt2++){
+			int r1 = st->bcoor[cnt1].r;
+			int c1 = st->bcoor[cnt1].c;
+			int r2 = nil_bps[cnt2].r;
+			int c2 = nil_bps[cnt2].c;
+			m[cnt1][cnt2] = -(abs(r2 - r1) + abs(c2 - c1));
+		}
+	}
+	dis = -km(st);
+	return 3 * dis;
 }
 
 int H(State *st)
@@ -502,16 +598,10 @@ void *IDA_star(void *arg)
 		fprintf(stderr, "thread pthread_setcanceltype failed\n");
 		exit(EXIT_FAILURE);
 	}
-	depth = beg_st->h -1;
+	depth = beg_st->h;
 	ans = NULL;
 	minf = inf;
 	while(ans == NULL){
-		if(depth == beg_st->h - 1){
-			depth += 1;
-		}
-		else{
-			depth = depth + minf + 1;
-		}
 		beg_st->next_count = 0;
 		clear_hash();
 		co.depth++;
@@ -521,6 +611,8 @@ void *IDA_star(void *arg)
 		co.hash_count = 0;
 		co.sac = 0;
 		ans = DFS(beg_st, end_st, depth, &minf);
+		depth = minf + 1;
+		minf = inf;
 	}
 	end_time = clock();
 	use_time = (double)(end_time - beg_time) / CLOCKS_PER_SEC;

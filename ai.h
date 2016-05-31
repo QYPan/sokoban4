@@ -4,6 +4,7 @@
 #include "action.h"
 #include <curses.h>
 #define HASH_SIZE 2379689
+#define N 200
 #define MAX(x, y) ((x)>(y)?(x):(y))
 #define MIN(x, y) ((x)<(y)?(x):(y))
 #define ABS(x) ((x)<0?(-(x)):(x))
@@ -28,7 +29,7 @@ typedef struct STATE{
 	int d1, d2;
 	int f, g, h, move; 
 	int next_count;
-	struct STATE *next[200];
+	struct STATE *next[N];
 	struct STATE *fa;
 }State;
 
