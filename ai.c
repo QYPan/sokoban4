@@ -47,6 +47,13 @@ void build_zobrist_board()
 	}
 }
 
+int state_cmp(const void *_s1, const void *_s2)
+{
+	State **s1 = (State **)_s1;
+	State **s2 = (State **)_s2;
+	return (*s1)->f - (*s2)->f;
+}
+
 int H(State *st)
 {
 	int cnt;
@@ -83,6 +90,7 @@ int H(State *st)
 State *new_state(char g[][MAPSIZE])
 {
 	int r, c, u = 0;
+	int cnt;
 	State *st = (State *)malloc(sizeof(State));
 	st->mark_val = 0;
 	for(r = 0; r < mele->row; r++){
@@ -100,6 +108,10 @@ State *new_state(char g[][MAPSIZE])
 			}
 		}
 	}
+	for(cnt = 0; cnt < 200; cnt++){
+		st->next[cnt] = NULL;
+	}
+	st->next_count = 0;
 	st->g = st->move = 0;
 	st->f = st->h = H(st);
 	st->fa = NULL;
@@ -424,13 +436,16 @@ void print_count(WINDOW *win_ptr, State *st)
 	wrefresh(win_ptr);
 }
 
-State *DFS(State *cur_st, State *end_st, int depth)
+State *DFS(State *cur_st, State *end_st, int depth, int *minf)
 {
 	int cnt;
 	if(cur_st->mark_val == end_st->mark_val){
 		return cur_st;
 	}
 	if(cur_st->f > depth){
+		if(cur_st->f < (*minf)){
+			*minf = cur_st->f;
+		}
 		return NULL;
 	}
 	for(cnt = 0; cnt < mele->box_count; cnt++){
@@ -441,13 +456,22 @@ State *DFS(State *cur_st, State *end_st, int depth)
 		for(i = 0; i < 4; i++){
 			State *st = try_move(cur_st, &tco, gr[i], gc[i]);
 			if(st != NULL){
-				State *ans = DFS(st, end_st, depth);
-				if(ans != NULL){
-					return ans;
-				}
-				free(st);
+				cur_st->next[cur_st->next_count++] = st;
 			}
 		}
+	}
+#if 1
+	qsort(cur_st->next, cur_st->next_count, sizeof(cur_st->next[0]), state_cmp);
+#endif
+
+	for(cnt = 0; cnt < cur_st->next_count; cnt++){
+		State *st = cur_st->next[cnt];
+		State *ans = DFS(st, end_st, depth, minf);
+		if(ans != NULL){
+			return ans;
+		}
+		free(st);
+		cur_st->next[cnt] = NULL;
 	}
 	return NULL;
 }
@@ -464,6 +488,7 @@ void *IDA_star(void *arg)
 	State *ans;
 	int res;
 	int depth;
+	int minf;
 	res = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 	if(res != 0){
 		fprintf(stderr, "thread pthread_setcancelstate failed\n");
@@ -479,8 +504,15 @@ void *IDA_star(void *arg)
 	}
 	depth = beg_st->h -1;
 	ans = NULL;
+	minf = inf;
 	while(ans == NULL){
-		depth += 1;
+		if(depth == beg_st->h - 1){
+			depth += 1;
+		}
+		else{
+			depth = depth + minf + 1;
+		}
+		beg_st->next_count = 0;
 		clear_hash();
 		co.depth++;
 		co.state_count = 0;
@@ -488,30 +520,24 @@ void *IDA_star(void *arg)
 		co.hit_count = 0;
 		co.hash_count = 0;
 		co.sac = 0;
-		ans = DFS(beg_st, end_st, depth);
+		ans = DFS(beg_st, end_st, depth, &minf);
 	}
 	end_time = clock();
 	use_time = (double)(end_time - beg_time) / CLOCKS_PER_SEC;
 
-	end_st->man_r = ans->man_r;
-	end_st->man_c = ans->man_c;
-	end_st->d1 = ans->d1;
-	end_st->d2 = ans->d2;
-	end_st->fa = ans->fa;
-	end_st->g = ans->g;
-	end_st->move = ans->move;
-	free(ans);
-
-	print_count(count_win, end_st);
-	print_ans(end_st->fa, end_st);
+	print_count(count_win, ans);
+	print_ans(ans->fa, ans);
 	pthread_exit(NULL);
 }
 
-void free_way(State *st)
+void free_tree(State *st)
 {
+	int cnt;
 	if(st == NULL)
 		return;
-	free_way(st->fa);
+	for(cnt = 0; cnt < st->next_count; cnt++){
+		free_tree(st->next[cnt]);
+	}
 	free(st);
 }
 
@@ -559,7 +585,8 @@ void computer_play(WINDOW *win_ptr, MAPELE *mapele)
 	}
 
 	clear_hash();
-	free_way(end_st);
+	free_tree(beg_st);
+	free(end_st);
 
 	wclear(count_win);
 	wrefresh(count_win);

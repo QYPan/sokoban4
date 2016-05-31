@@ -27,6 +27,8 @@ typedef struct STATE{
 	int man_r, man_c;
 	int d1, d2;
 	int f, g, h, move; 
+	int next_count;
+	struct STATE *next[200];
 	struct STATE *fa;
 }State;
 
