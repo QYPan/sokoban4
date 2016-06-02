@@ -11,6 +11,7 @@ typedef struct{
 	int fillcount;
 }Ncoor;
 
+/* 之字形死锁 */
 int judge_kill1(char tbox[][MAPSIZE], int br, int bc)
 {
 	Ncoor Stack[1000];
@@ -30,12 +31,14 @@ int judge_kill1(char tbox[][MAPSIZE], int br, int bc)
 		fcount = 1;
 
 	for(k = 0; k < 4; k++){
+		int bbr = br+gr[k];
+		int bbc = bc+gc[k];
 		dead[k] = 0;
 		fill[k] = 1;
-		if(JBW(br+gr[k], bc+gc[k])){
+		if(JBW(bbr, bbc)){
 			Ncoor dir;
-			dir.r = br+gr[k];
-			dir.c = bc+gc[k];
+			dir.r = bbr;
+			dir.c = bbc;
 			dir.boxcount = bcount;
 			dir.fillcount = fcount;
 			memset(v, 0, sizeof(v));
@@ -63,20 +66,24 @@ int judge_kill1(char tbox[][MAPSIZE], int br, int bc)
 				beg = flag;
 				for(i = beg; i < beg+2; i++){
 					Ncoor nd;
+					int tbr;
+					int tbc;
 					nd.r = d.r+gr[i];
 					nd.c = d.c+gc[i];
 					nd.boxcount = d.boxcount;
 					nd.fillcount = d.fillcount;
-					if(JBW(nd.r, nd.c) && !v[nd.r][nd.c]){
+					tbr = nd.r;
+					tbc = nd.c;
+					if(JBW(tbr, tbc) && !v[tbr][tbc]){
 						int tbeg;
 						if(flag == 2) tbeg = 0;
 						else tbeg = 2;
-						v[nd.r][nd.c] = 1;
-						if(tbox[nd.r][nd.c] == mele->box_g){
-							int ndr1 = nd.r + gr[tbeg];
-							int ndc1 = nd.c + gc[tbeg];
-							int ndr2 = nd.r + gr[tbeg+1];
-							int ndc2 = nd.c + gc[tbeg+1];
+						v[tbr][tbc] = 1;
+						if(tbox[tbr][tbc] == mele->box_g){
+							int ndr1 = tbr + gr[tbeg];
+							int ndc1 = tbc + gc[tbeg];
+							int ndr2 = tbr + gr[tbeg+1];
+							int ndc2 = tbc + gc[tbeg+1];
 							nd.boxcount++;
 							if(v[ndr1][ndc1] && tbox[ndr1][ndc1] == mele->box_g){
 								if(ndr1 == br && ndc1 == bc)
@@ -87,7 +94,7 @@ int judge_kill1(char tbox[][MAPSIZE], int br, int bc)
 									dead4 = 1;
 							}
 						}
-						if(NIL_BOX[nd.r][nd.c] == mele->nil_box_g)
+						if(NIL_BOX[tbr][tbc] == mele->nil_box_g)
 							nd.fillcount++;
 						if(dead4){
 							dead[k] = 1;
@@ -110,17 +117,13 @@ int judge_kill1(char tbox[][MAPSIZE], int br, int bc)
 			}
 		}
 	}
-	if(dead[0] && dead[2] && fill[0] && fill[2])
-		return 0;
-	if(dead[0] && dead[3] && fill[0] && fill[3])
-		return 0;
-	if(dead[1] && dead[2] && fill[1] && fill[2])
-		return 0;
-	if(dead[1] && dead[3] && fill[1] && fill[3])
-		return 0;
-	if(dead[0] && (dead[2] || dead[3]))
+	if(dead[0] && dead[2] && !(fill[0] && fill[2]))
 		return 1;
-	if(dead[1] && (dead[2] || dead[3]))
+	if(dead[0] && dead[3] && !(fill[0] && fill[3]))
+		return 1;
+	if(dead[1] && dead[2] && !(fill[1] && fill[2]))
+		return 1;
+	if(dead[1] && dead[3] && !(fill[1] && fill[3]))
 		return 1;
 	return 0;
 }
