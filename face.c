@@ -201,6 +201,7 @@ WINDOW *draw_game_map(char *g[], MAPELE *mele)
 		for(col = 0; g[row][col]; col++){
 			if(g[row][col] == '*'){
 				BOX[row][col] = '*';
+				NIL_BOX[row][col] = ' ';
 				mele->curr = row;
 				mele->curc = col;
 				chose_color(map_win, mele->cur_color);
@@ -217,12 +218,14 @@ WINDOW *draw_game_map(char *g[], MAPELE *mele)
 			}
 			else if(g[row][col] == 'O'){
 				NIL_BOX[row][col] = 'O';
+				BOX[row][col] = ' ';
 				mele->box_count++;
 				chose_color(map_win, mele->nil_color);
 				mvwprintw(map_win, row, col, "%c", mele->nil_box_p);
 			}
 			else if(g[row][col] == '@'){
 				BOX[row][col] = '@';
+				NIL_BOX[row][col] = ' ';
 				chose_color(map_win, mele->box_color);
 				mvwprintw(map_win, row, col, "%c", mele->box_p);
 			}

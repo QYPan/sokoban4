@@ -410,25 +410,28 @@ State *try_move(State *fa, Coor *coor, int d1, int d2)
 	golen = go_there(fa, fa->man_r, fa->man_c, br-d1, bc-d2);
 	if(golen >= 0){
 		if(fa->m[br+d1][bc+d2] != mele->wall_g && fa->m[br+d1][bc+d2] != mele->box_g){
-			/* !!!!!!!!!!!!!!!!!! */
+			int ki;
 			fa->m[br][bc] = mele->man_g;
 			fa->m[cr][cc] = mele->empty_g;
 			fa->m[br+d1][bc+d2] = mele->box_g;
-			p = new_state(fa->m);
-			p->fa = fa;
-			p->man_r = br;
-			p->man_c = bc;
-			p->d1 = d1;
-			p->d2 = d2;
-			p->move = fa->move + golen + 1;
-			p->g = fa->g + 1;
-			p->f = (p->g) + (p->h);
-			if(!try_insert(p)){
-				free(p);
-				p = NULL;
-			}
-			else{
-				co.state_count++;
+			ki = kill(fa->m, br+d1, bc+d2);
+			if(!ki){ /* 不产生死锁 */
+				p = new_state(fa->m);
+				p->fa = fa;
+				p->man_r = br;
+				p->man_c = bc;
+				p->d1 = d1;
+				p->d2 = d2;
+				p->move = fa->move + golen + 1;
+				p->g = fa->g + 1;
+				p->f = (p->g) + (p->h);
+				if(!try_insert(p)){
+					free(p);
+					p = NULL;
+				}
+				else{
+					co.state_count++;
+				}
 			}
 			fa->m[br][bc] = mele->box_g;
 			fa->m[br+d1][bc+d2] = mele->empty_g;
