@@ -49,6 +49,8 @@ typedef struct{
 }Count;
 
 extern MAPELE *mele;
+extern int gr[];
+extern int gc[];
 extern void computer_play(WINDOW *win_ptr, MAPELE *mele);
 
 #endif

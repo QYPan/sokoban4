@@ -367,6 +367,7 @@ int try_match(Hashele *ht, State *st)
 	new_ht->mc = st->man_c;
 	new_ht->next = NULL;
 	htmp->next = new_ht;
+
 	if(mat) co.hit_count++;
 	if(c > co.sac) co.sac = c;
 	return 0;
@@ -378,11 +379,13 @@ int find_hash(State *st, int val)
 	if(hashtable[ins] != NULL){
 		return try_match(hashtable[ins], st);
 	}
+
 	Hashele *new_ele = (Hashele *)malloc(sizeof(Hashele));
 	new_ele->key = st->mark_val;
 	new_ele->mr = st->man_r;
 	new_ele->mc = st->man_c;
 	new_ele->next = NULL;
+
 	hashtable[ins] = new_ele;
 	co.hash_count++;
 	return 0;
@@ -556,9 +559,8 @@ State *DFS(State *cur_st, State *end_st, int depth, int *minf)
 			}
 		}
 	}
-#if 1
+
 	qsort(cur_st->next, cur_st->next_count, sizeof(cur_st->next[0]), state_cmp);
-#endif
 
 	for(cnt = 0; cnt < cur_st->next_count; cnt++){
 		State *st = cur_st->next[cnt];
