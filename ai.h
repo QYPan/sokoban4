@@ -28,6 +28,7 @@ typedef struct STATE{
 	Coor bcoor[100];
 	int man_r, man_c;
 	int d1, d2;
+	int bnum;
 	int f, g, h, move; 
 	int next_count;
 	struct STATE *next[N];

@@ -121,7 +121,7 @@ int km()
 	return ans;
 }
 
-int H1(State *st)
+int H(State *st)
 {
 	int r, c;
 	int cnt1, cnt2;
@@ -147,10 +147,10 @@ int H1(State *st)
 		}
 	}
 	dis = -km(st);
-	return 3 * dis;
+	return 2 * dis;
 }
 
-int H(State *st)
+int H1(State *st)
 {
 	int cnt;
 	int r, c;
@@ -180,7 +180,7 @@ int H(State *st)
 		}
 		total_dis += dis;
 	}
-	return total_dis;
+	return 2*total_dis;
 }
 
 State *new_state(char g[][MAPSIZE])
@@ -350,6 +350,13 @@ int try_match(Hashele *ht, State *st)
 	int mat = 0;
 	while(1){
 		if(judge_2state(htmp, st, 1)){
+			if(st->g < htmp->step){
+				htmp->step = st->g;
+				htmp->mr = st->man_r;
+				htmp->mc = st->man_c;
+				co.state_count--;
+				return -1;
+			}
 			co.same_count++;
 			return htmp->step;
 		}
@@ -363,7 +370,7 @@ int try_match(Hashele *ht, State *st)
 	}
 	new_ht = (Hashele *)malloc(sizeof(Hashele));
 	new_ht->key = st->mark_val;
-	new_ht->step = st->f;
+	new_ht->step = st->g;
 	new_ht->mr = st->man_r;
 	new_ht->mc = st->man_c;
 	new_ht->next = NULL;
@@ -382,7 +389,7 @@ int find_hash(State *st, int val)
 	}
 	Hashele *new_ele = (Hashele *)malloc(sizeof(Hashele));
 	new_ele->key = st->mark_val;
-	new_ele->step = st->f;
+	new_ele->step = st->g;
 	new_ele->mr = st->man_r;
 	new_ele->mc = st->man_c;
 	new_ele->next = NULL;
@@ -539,16 +546,10 @@ State *DFS(State *cur_st, State *end_st, int depth, int *minf)
 		return cur_st;
 	}
 
+#if 0
 	if(depth == 0)
 		return NULL;
-
-	step = try_insert(cur_st); 
-	if(step != -1 && cur_st->f >= step){
-		return NULL;
-	}
-	else 
-		co.state_count++;
-#if 0
+#endif
 
 	if(cur_st->f > depth){
 		if(cur_st->f < (*minf)){
@@ -556,7 +557,14 @@ State *DFS(State *cur_st, State *end_st, int depth, int *minf)
 		}
 		return NULL;
 	}
-#endif
+
+	step = try_insert(cur_st);
+	if(step != -1){ /* 此状态已搜索过 */
+		return NULL;
+	}
+	else 
+		co.state_count++;
+
 	for(cnt = 0; cnt < mele->box_count; cnt++){
 		Coor tco;
 		int i;
@@ -574,7 +582,7 @@ State *DFS(State *cur_st, State *end_st, int depth, int *minf)
 
 	for(cnt = 0; cnt < cur_st->next_count; cnt++){
 		State *st = cur_st->next[cnt];
-		State *ans = DFS(st, end_st, depth-1, minf);
+		State *ans = DFS(st, end_st, depth, minf);
 		if(ans != NULL){
 			return ans;
 		}
@@ -610,7 +618,7 @@ void *IDA_star(void *arg)
 		fprintf(stderr, "thread pthread_setcanceltype failed\n");
 		exit(EXIT_FAILURE);
 	}
-	depth = 1;
+	depth = beg_st->h;
 	ans = NULL;
 	minf = inf;
 	while(ans == NULL){
@@ -623,7 +631,7 @@ void *IDA_star(void *arg)
 		co.hash_count = 0;
 		co.sac = 0;
 		ans = DFS(beg_st, end_st, depth, &minf);
-		depth = depth + 1;
+		depth = minf;
 		minf = inf;
 	}
 	end_time = clock();
