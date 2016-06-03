@@ -4,6 +4,8 @@
 
 #define JBW(r, c) \
 	(tbox[r][c] == mele->box_g || tbox[r][c] == mele->wall_g)
+#define JUDGE(r, c) \
+	(r >= 0 && r < mele->row && c >= 0 && c < mele->col)
 
 typedef struct{
 	int r, c;
@@ -128,9 +130,74 @@ int judge_kill1(char tbox[][MAPSIZE], int br, int bc)
 	return 0;
 }
 
-int kill(char g[][MAPSIZE], int br, int bc)
+/* 凹形死锁 */
+int judge_kill2(char tbox[][MAPSIZE], int br, int bc, int d1, int d2)
+{
+	int bcount = 1;
+	int fcount = 0;
+	int lwr, lwc;
+	int d3, d4;
+	int ok[2]; /* 两头是否密封标志 */
+	int time;
+	if(NIL_BOX[br][bc] == mele->nil_box_g)
+		fcount++;
+	lwr = br + d1;
+	lwc = bc + d2;
+	if(tbox[lwr][lwc] != mele->wall_g)
+		return 0;
+	if(d1){ d3 = 0; d4 = 1;} /* 竖向推 */
+	else { d3 = 1; d4 = 0;} /* 横向推 */
+	for(time = 0; time < 2; time++){
+		int twr = lwr;
+		int twc = lwc;
+		int mul;
+		if(!time) mul = -1;
+		else mul = 1;
+		ok[time] = 0;
+		while(JUDGE(twr, twc)){ /* 判断左边或下边 */
+			int tr = twr - d1;
+			int tc = twc - d2;
+			tr = tr + d3*mul;
+			tc = tc + d4*mul;
+			if(tbox[tr][tc] == mele->wall_g){
+				ok[time] = 1;
+				break;
+			}
+			twr = tr + d1;
+			twc = tc + d2;
+			if(tbox[twr][twc] != mele->wall_g){
+				break;
+			}
+			if(tbox[tr][tc] == mele->box_g){
+				if(tbox[tr-d3*mul][tc-d4*mul] == mele->box_g){
+					bcount--;
+					fcount--;
+					ok[time] = 1;
+					break;
+				}
+				bcount++;
+			}
+			if(NIL_BOX[tr][tc] == mele->nil_box_g){
+				fcount++;
+			}
+		}
+	}
+#if 0
+	printf("ok0: %d\n", ok[0]);
+	printf("ok1: %d\n", ok[1]);
+	printf("bcount: %d\n", bcount);
+	printf("fcount: %d\n", fcount);
+#endif
+	if(ok[0] && ok[1] && bcount > fcount) /* 两端密封且里面箱子数大于目标点数 */
+		return 1;
+	return 0;
+}
+
+int kill(char g[][MAPSIZE], int br, int bc, int d1, int d2)
 {
 	if(judge_kill1(g, br, bc))
+		return 1;
+	if(judge_kill2(g, br, bc, d1, d2))
 		return 1;
 	return 0;
 }

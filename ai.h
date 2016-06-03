@@ -17,6 +17,7 @@ typedef struct{
 
 typedef struct HASHELE{
 	LL key;
+	int step;
 	int mr, mc;
 	struct HASHELE *next;
 }Hashele;
@@ -52,6 +53,6 @@ extern MAPELE *mele;
 extern int gr[];
 extern int gc[];
 extern void computer_play(WINDOW *win_ptr, MAPELE *mele);
-extern int kill(char g[][MAPSIZE], int br, int bc);
+extern int kill(char g[][MAPSIZE], int br, int bc, int d1, int d2);
 
 #endif

@@ -143,7 +143,7 @@ int H1(State *st)
 			int c1 = st->bcoor[cnt1].c;
 			int r2 = nil_bps[cnt2].r;
 			int c2 = nil_bps[cnt2].c;
-			m[cnt1][cnt2] = -(abs(r2 - r1) + abs(c2 - c1));
+			m[cnt1][cnt2] = -(ABS(r2 - r1) + ABS(c2 - c1));
 		}
 	}
 	dis = -km(st);
@@ -193,7 +193,7 @@ State *new_state(char g[][MAPSIZE])
 		for(c = 0; c < mele->col; c++){
 			st->m[r][c] = g[r][c];
 			if(g[r][c] == mele->box_g){
-				st->mark_val ^= mark[0][r][c];
+				(st->mark_val) ^= mark[0][r][c];
 				st->bcoor[u].r = r;
 				st->bcoor[u].c = c;
 				u++;
@@ -269,7 +269,7 @@ State *get_end_state()
 	for(r = 0; r < mele->row; r++){
 		for(c = 0; c < mele->col; c++){
 			if(NIL_BOX[r][c] == mele->nil_box_g){
-				end_st->mark_val ^= mark[0][r][c];
+				(end_st->mark_val) ^= mark[0][r][c];
 				end_st->bcoor[u].r = r;
 				end_st->bcoor[u].c = c;
 				u++;
@@ -351,7 +351,7 @@ int try_match(Hashele *ht, State *st)
 	while(1){
 		if(judge_2state(htmp, st, 1)){
 			co.same_count++;
-			return 1;
+			return htmp->step;
 		}
 		if(htmp->key != st->mark_val)
 			mat = 1;
@@ -363,6 +363,7 @@ int try_match(Hashele *ht, State *st)
 	}
 	new_ht = (Hashele *)malloc(sizeof(Hashele));
 	new_ht->key = st->mark_val;
+	new_ht->step = st->f;
 	new_ht->mr = st->man_r;
 	new_ht->mc = st->man_c;
 	new_ht->next = NULL;
@@ -370,7 +371,7 @@ int try_match(Hashele *ht, State *st)
 
 	if(mat) co.hit_count++;
 	if(c > co.sac) co.sac = c;
-	return 0;
+	return -1;
 }
 
 int find_hash(State *st, int val)
@@ -379,24 +380,22 @@ int find_hash(State *st, int val)
 	if(hashtable[ins] != NULL){
 		return try_match(hashtable[ins], st);
 	}
-
 	Hashele *new_ele = (Hashele *)malloc(sizeof(Hashele));
 	new_ele->key = st->mark_val;
+	new_ele->step = st->f;
 	new_ele->mr = st->man_r;
 	new_ele->mc = st->man_c;
 	new_ele->next = NULL;
 
 	hashtable[ins] = new_ele;
 	co.hash_count++;
-	return 0;
+	return -1;
 }
 
 int try_insert(State *st)
 {
 	int hashvalue = get_hashval(st);
-	if(!find_hash(st, hashvalue))
-		return 1;
-	return 0;
+	return find_hash(st, hashvalue);
 }
 
 State *try_move(State *fa, Coor *coor, int d1, int d2)
@@ -414,7 +413,7 @@ State *try_move(State *fa, Coor *coor, int d1, int d2)
 			fa->m[br][bc] = mele->man_g;
 			fa->m[cr][cc] = mele->empty_g;
 			fa->m[br+d1][bc+d2] = mele->box_g;
-			ki = kill(fa->m, br+d1, bc+d2);
+			ki = kill(fa->m, br+d1, bc+d2, d1, d2);
 			if(!ki){ /* 不产生死锁 */
 				p = new_state(fa->m);
 				p->fa = fa;
@@ -425,13 +424,6 @@ State *try_move(State *fa, Coor *coor, int d1, int d2)
 				p->move = fa->move + golen + 1;
 				p->g = fa->g + 1;
 				p->f = (p->g) + (p->h);
-				if(!try_insert(p)){
-					free(p);
-					p = NULL;
-				}
-				else{
-					co.state_count++;
-				}
 			}
 			fa->m[br][bc] = mele->box_g;
 			fa->m[br+d1][bc+d2] = mele->empty_g;
@@ -541,15 +533,30 @@ void print_count(WINDOW *win_ptr, State *st)
 State *DFS(State *cur_st, State *end_st, int depth, int *minf)
 {
 	int cnt;
+	int step;
+
 	if(cur_st->mark_val == end_st->mark_val){
 		return cur_st;
 	}
+
+	if(depth == 0)
+		return NULL;
+
+	step = try_insert(cur_st); 
+	if(step != -1 && cur_st->f >= step){
+		return NULL;
+	}
+	else 
+		co.state_count++;
+#if 0
+
 	if(cur_st->f > depth){
 		if(cur_st->f < (*minf)){
 			*minf = cur_st->f;
 		}
 		return NULL;
 	}
+#endif
 	for(cnt = 0; cnt < mele->box_count; cnt++){
 		Coor tco;
 		int i;
@@ -567,7 +574,7 @@ State *DFS(State *cur_st, State *end_st, int depth, int *minf)
 
 	for(cnt = 0; cnt < cur_st->next_count; cnt++){
 		State *st = cur_st->next[cnt];
-		State *ans = DFS(st, end_st, depth, minf);
+		State *ans = DFS(st, end_st, depth-1, minf);
 		if(ans != NULL){
 			return ans;
 		}
@@ -603,7 +610,7 @@ void *IDA_star(void *arg)
 		fprintf(stderr, "thread pthread_setcanceltype failed\n");
 		exit(EXIT_FAILURE);
 	}
-	depth = beg_st->h;
+	depth = 1;
 	ans = NULL;
 	minf = inf;
 	while(ans == NULL){
@@ -616,7 +623,7 @@ void *IDA_star(void *arg)
 		co.hash_count = 0;
 		co.sac = 0;
 		ans = DFS(beg_st, end_st, depth, &minf);
-		depth = minf + 1;
+		depth = depth + 1;
 		minf = inf;
 	}
 	end_time = clock();
