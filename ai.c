@@ -11,16 +11,18 @@
 const int inf = (1<<30);
 
 Hashele *hashtable[HASH_SIZE];
+int dist[MAPSIZE][MAPSIZE][BOXCOUNT];
 LL mark[2][MAPSIZE][MAPSIZE];
+Coor nil_bps[100];
 int gr[] = {-1, 1, 0, 0};
 int gc[] = {0, 0, -1, 1};
-int m[N][N];
-int lx[N];
-int ly[N];
-int vx[N];
-int vy[N];
-int slack[N];
-int mylink[N];
+int m[BOXCOUNT][BOXCOUNT];
+int lx[BOXCOUNT];
+int ly[BOXCOUNT];
+int vx[BOXCOUNT];
+int vy[BOXCOUNT];
+int slack[BOXCOUNT];
+int mylink[BOXCOUNT];
 
 MAPELE *mele;
 WINDOW *cur_win;
@@ -54,11 +56,101 @@ void build_zobrist_board()
 	}
 }
 
+void init_distant()
+{
+	int mque[10000];
+	int vis[MAPSIZE*MAPSIZE];
+	int len[MAPSIZE*MAPSIZE];
+	int r, c, k;
+	int row = mele->row;
+	int col = mele->col;
+	for(r = 0; r < row; r++){
+		for(c = 0; c < col; c++){
+			for(k = 0; k < mele->box_count; k++){
+				dist[r][c][k] = inf;
+				int er = nil_bps[k].r;
+				int ec = nil_bps[k].c;
+				if(NIL_BOX[r][c] != mele->wall_g){
+					int front = 0, rear = 1;
+					int node = r * col + c;
+					memset(vis, 0, sizeof(vis));
+					memset(len, 0, sizeof(len));
+					mque[front] = node;
+					vis[node] = 1;
+					while(front < rear){
+						int cur = mque[front++];
+						int cr = cur / col;
+						int cc = cur % col;
+						int i;
+						if(cr == er && cc == ec){
+							dist[r][c][k] = len[cur];
+							break;
+						}
+						for(i = 0; i < 4; i++){
+							int nr = cr + gr[i];
+							int nc = cc + gc[i];
+							int nnode = nr * col + nc;
+							if(nr < 0 || nr >= row || nc < 0 || nc >= col)
+								continue;
+							if(NIL_BOX[nr][nc] != mele->wall_g && NIL_BOX[nr][nc] != mele->box_g && !vis[nnode]){
+								vis[nnode] = 1;
+								len[nnode] = len[cur] + 1;
+								mque[rear++] = nnode;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+}
+
 int state_cmp(const void *_s1, const void *_s2)
 {
 	State **s1 = (State **)_s1;
 	State **s2 = (State **)_s2;
 	return (*s1)->f - (*s2)->f;
+}
+
+int go_there(State *st, Coor *beg, Coor *end, int flag)
+{
+	int len[MAPSIZE*MAPSIZE];
+	int vis[MAPSIZE*MAPSIZE];
+	int mque[10000];
+	int f = 0, r = 1;
+	int i;
+	int col = mele->col;
+	int mr = beg->r;
+	int mc = beg->c;
+	int er = end->r;
+	int ec = end->c;
+	memset(vis, 0, sizeof(vis));
+	memset(len, 0, sizeof(len));
+	mque[f] = mr * col + mc;
+	vis[mque[f]] = 1;
+	while(f < r){
+		int p = mque[f++];
+		int jr = p / col;
+		int jc = p % col;
+		if(jr == er && jc == ec){
+			return len[p];
+		}
+		for(i = 0; i < 4; i++){
+			int nr = jr + gr[i];
+			int nc = jc + gc[i];
+			int np = nr * col + nc;
+			if(st->m[nr][nc] != mele->wall_g  && !vis[np]){
+				if(flag && st->m[nr][nc] == mele->box_g){ /* 要判断箱子的影响 */
+					continue;
+				}
+				vis[np] = 1;
+				len[np] = len[p] + 1;
+				mque[r++] = np;
+			}
+		}
+	}
+	return -1;
 }
 
 int dfs(int u)  
@@ -123,31 +215,30 @@ int km()
 
 int H(State *st)
 {
-	int r, c;
 	int cnt1, cnt2;
 	int dis = 0;
-	int nil_c = 0;
-	Coor nil_bps[100];
-	for(r = 0; r < mele->row; r++){
-		for(c = 0; c < mele->col; c++){
-			if(NIL_BOX[r][c] == mele->nil_box_g){
-				nil_bps[nil_c].r = r;
-				nil_bps[nil_c].c = c;
-				nil_c++;
-			}
-		}
+	memset(ly, 0, sizeof(ly));
+	for(cnt1 = 0; cnt1 < mele->box_count; cnt1++){
+		lx[cnt1] = -inf;
 	}
 	for(cnt1 = 0; cnt1 < mele->box_count; cnt1++){
-		for(cnt2 = 0; cnt2 < nil_c; cnt2++){
-			int r1 = st->bcoor[cnt1].r;
-			int c1 = st->bcoor[cnt1].c;
-			int r2 = nil_bps[cnt2].r;
-			int c2 = nil_bps[cnt2].c;
-			m[cnt1][cnt2] = -(ABS(r2 - r1) + ABS(c2 - c1));
+		Coor beg;
+		beg.r = st->bcoor[cnt1].r;
+		beg.c = st->bcoor[cnt1].c;
+		for(cnt2 = 0; cnt2 < mele->box_count; cnt2++){
+			Coor end;
+			end.r = nil_bps[cnt2].r;
+			end.c = nil_bps[cnt2].c;
+#if 0
+			m[cnt1][cnt2] = -go_there(st, &beg, &end, 0);
+#endif
+			m[cnt1][cnt2] = -dist[beg.r][beg.c][cnt2];
+			if(m[cnt1][cnt2] > lx[cnt1])
+				lx[cnt1] = m[cnt1][cnt2];
 		}
 	}
 	dis = -km(st);
-	return 2 * dis;
+	return dis;
 }
 
 int H1(State *st)
@@ -204,7 +295,7 @@ State *new_state(char g[][MAPSIZE])
 			}
 		}
 	}
-	for(cnt = 0; cnt < 200; cnt++){
+	for(cnt = 0; cnt < (BOXCOUNT<<2); cnt++){
 		st->next[cnt] = NULL;
 	}
 	st->next_count = 0;
@@ -214,45 +305,18 @@ State *new_state(char g[][MAPSIZE])
 	return st;
 }
 
-int go_there(State *st, int mr, int mc, int er, int ec)
-{
-	int f = 0, r = 1;
-	int i;
-	int col = mele->col;
-	int len[MAPSIZE*MAPSIZE];
-	int vis[MAPSIZE*MAPSIZE];
-	int mque[10000];
-	memset(vis, 0, sizeof(vis));
-	memset(len, 0, sizeof(len));
-	mque[f] = mr * col + mc;
-	vis[mque[f]] = 1;
-	while(f < r){
-		int p = mque[f++];
-		int jr = p / col;
-		int jc = p % col;
-		if(jr == er && jc == ec){
-			return len[p];
-		}
-		for(i = 0; i < 4; i++){
-			int nr = jr + gr[i];
-			int nc = jc + gc[i];
-			int np = nr * col + nc;
-			if(st->m[nr][nc] != mele->wall_g && st->m[nr][nc] != mele->box_g && !vis[np]){
-				vis[np] = 1;
-				len[np] = len[p] + 1;
-				mque[r++] = np;
-			}
-		}
-	}
-	return -1;
-}
 
 int judge_2state(Hashele *ht, State *s2, int flag)
 {
 	if(ht->key != s2->mark_val) /* 如果他们到64位键值不同，基本认为箱子的位置不同 */
 		return 0;
 	if(flag){
-		if(go_there(s2, ht->mr,  ht->mc, s2->man_r, s2->man_c) >= 0)
+		Coor beg, end;
+		beg.r = ht->mr;
+		beg.c = ht->mc;
+		end.r = s2->man_r;
+		end.c = s2->man_c;
+		if(go_there(s2, &beg, &end, 1) >= 0)
 			return 1;
 		else
 			return 0;
@@ -272,6 +336,8 @@ State *get_end_state()
 				(end_st->mark_val) ^= mark[0][r][c];
 				end_st->bcoor[u].r = r;
 				end_st->bcoor[u].c = c;
+				nil_bps[u].r = r;
+				nil_bps[u].c = c;
 				u++;
 			}
 		}
@@ -315,6 +381,7 @@ void init_tools()
 	co.hit_count = 0;
 	co.hash_count = 0;
 	co.same_count = 0;
+	co.move_count = 0;
 	co.depth = 0;
 	co.sac = 0;
 }
@@ -343,13 +410,13 @@ int get_hashval(State *st)
 #endif
 }
 
-int try_match(Hashele *ht, State *st)
+int try_match(Hashele *ht, State *st, int check[][MAPSIZE])
 {
 	Hashele *htmp = ht, *new_ht;
 	int c = 0;
 	int mat = 0;
 	while(1){
-		if(judge_2state(htmp, st, 1)){
+		if(htmp->key == st->mark_val && check[htmp->mr][htmp->mc] == check[st->man_r][st->man_c]){
 			if(st->g < htmp->step){
 				htmp->step = st->g;
 				htmp->mr = st->man_r;
@@ -381,11 +448,11 @@ int try_match(Hashele *ht, State *st)
 	return -1;
 }
 
-int find_hash(State *st, int val)
+int find_hash(State *st, int val, int check[][MAPSIZE])
 {
 	int ins = val;
 	if(hashtable[ins] != NULL){
-		return try_match(hashtable[ins], st);
+		return try_match(hashtable[ins], st, check);
 	}
 	Hashele *new_ele = (Hashele *)malloc(sizeof(Hashele));
 	new_ele->key = st->mark_val;
@@ -399,10 +466,10 @@ int find_hash(State *st, int val)
 	return -1;
 }
 
-int try_insert(State *st)
+int try_insert(State *st, int check[][MAPSIZE])
 {
 	int hashvalue = get_hashval(st);
-	return find_hash(st, hashvalue);
+	return find_hash(st, hashvalue, check);
 }
 
 State *try_move(State *fa, Coor *coor, int d1, int d2)
@@ -411,31 +478,28 @@ State *try_move(State *fa, Coor *coor, int d1, int d2)
 	int bc = coor->c;
 	int cr = fa->man_r;
 	int cc = fa->man_c;
-	int golen;
+	int golen = 0;
 	State *p = NULL;
-	golen = go_there(fa, fa->man_r, fa->man_c, br-d1, bc-d2);
-	if(golen >= 0){
-		if(fa->m[br+d1][bc+d2] != mele->wall_g && fa->m[br+d1][bc+d2] != mele->box_g){
-			int ki;
-			fa->m[br][bc] = mele->man_g;
-			fa->m[cr][cc] = mele->empty_g;
-			fa->m[br+d1][bc+d2] = mele->box_g;
-			ki = kill(fa->m, br+d1, bc+d2, d1, d2);
-			if(!ki){ /* 不产生死锁 */
-				p = new_state(fa->m);
-				p->fa = fa;
-				p->man_r = br;
-				p->man_c = bc;
-				p->d1 = d1;
-				p->d2 = d2;
-				p->move = fa->move + golen + 1;
-				p->g = fa->g + 1;
-				p->f = (p->g) + (p->h);
-			}
-			fa->m[br][bc] = mele->box_g;
-			fa->m[br+d1][bc+d2] = mele->empty_g;
-			fa->m[cr][cc] = mele->man_g;
+	if(fa->m[br+d1][bc+d2] != mele->wall_g && fa->m[br+d1][bc+d2] != mele->box_g){
+		int ki;
+		fa->m[br][bc] = mele->man_g;
+		fa->m[cr][cc] = mele->empty_g;
+		fa->m[br+d1][bc+d2] = mele->box_g;
+		ki = kill(fa->m, br+d1, bc+d2, d1, d2);
+		if(!ki){ /* 不产生死锁 */
+			p = new_state(fa->m);
+			p->fa = fa;
+			p->man_r = br;
+			p->man_c = bc;
+			p->d1 = d1;
+			p->d2 = d2;
+			p->move = fa->move + golen + 1;
+			p->g = fa->g + 1;
+			p->f = (p->g) + (p->h);
 		}
+		fa->m[br][bc] = mele->box_g;
+		fa->m[br+d1][bc+d2] = mele->empty_g;
+		fa->m[cr][cc] = mele->man_g;
 	}
 	return p;
 }
@@ -532,13 +596,48 @@ void print_count(WINDOW *win_ptr, State *st)
 	mvwprintw(win_ptr, n++, 0, "time: %.2lf s", use_time);
 	mvwprintw(win_ptr, n++, 0, "deep: %d", co.depth);
 	mvwprintw(win_ptr, n++, 0, "push: %d", st->g);
-	mvwprintw(win_ptr, n++, 0, "move: %d", st->move);
 	mvwprintw(win_ptr, n++, 0, "len:  %d", co.sac);
 	wrefresh(win_ptr);
 }
 
+void cal_check(State *st, int check[][MAPSIZE])
+{
+	int mque[10000];
+	int r, c;
+	int row = mele->row;
+	int col = mele->col;
+	int num = 0;
+	for(r = 0; r < row; r++){
+		for(c = 0; c < col; c++){
+			if(st->m[r][c] == mele->empty_g && !check[r][c]){
+				int front = 0, rear = 1;
+				int node = r * col + c;
+				num++;
+				mque[front] = node;
+				while(front < rear){
+					int cur = mque[front++];
+					int cr = cur / col;
+					int cc = cur % col;
+					int i;
+					for(i = 0; i < 4; i++){
+						int nr = cr + gr[i];
+						int nc = cc + gc[i];
+						if(nr < 0 || nr >= row || nc < 0 || nc >= col)
+							continue;
+						if(st->m[nr][nc] != mele->wall_g && st->m[nr][nc] != mele->box_g && !check[nr][nc]){
+							check[nr][nc] = num;
+							mque[rear++] = nr * col + nc;
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 State *DFS(State *cur_st, State *end_st, int depth, int *minf)
 {
+	int check[MAPSIZE][MAPSIZE];
 	int cnt;
 	int step;
 
@@ -558,7 +657,10 @@ State *DFS(State *cur_st, State *end_st, int depth, int *minf)
 		return NULL;
 	}
 
-	step = try_insert(cur_st);
+	memset(check, 0, sizeof(check));
+	cal_check(cur_st, check); /* 预处理地图连通性 */
+
+	step = try_insert(cur_st, check);
 	if(step != -1){ /* 此状态已搜索过 */
 		return NULL;
 	}
@@ -571,7 +673,11 @@ State *DFS(State *cur_st, State *end_st, int depth, int *minf)
 		tco.r = cur_st->bcoor[cnt].r;
 		tco.c = cur_st->bcoor[cnt].c;
 		for(i = 0; i < 4; i++){
-			State *st = try_move(cur_st, &tco, gr[i], gc[i]);
+			int d1 = gr[i];
+			int d2 = gc[i];
+			if(check[cur_st->man_r][cur_st->man_c] != check[tco.r-d1][tco.c-d2])
+				continue;
+			State *st = try_move(cur_st, &tco, d1, d2);
 			if(st != NULL){
 				cur_st->next[cur_st->next_count++] = st;
 			}
@@ -627,6 +733,7 @@ void *IDA_star(void *arg)
 		co.depth++;
 		co.state_count = 0;
 		co.same_count = 0;
+		co.move_count = 0;
 		co.hit_count = 0;
 		co.hash_count = 0;
 		co.sac = 0;
@@ -669,6 +776,7 @@ void computer_play(WINDOW *win_ptr, MAPELE *mapele)
 	cur_win = win_ptr;
 
 	end_st = get_end_state();
+	init_distant();
 	beg_st = new_state(BOX);
 
 

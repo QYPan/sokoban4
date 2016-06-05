@@ -198,6 +198,7 @@ WINDOW *draw_game_map(char *g[], MAPELE *mele)
 	map_win = newwin(mele->row, mele->col, beg_row, beg_col);
 	row = 0;
 	while(g[row][0]){
+		int i;
 		for(col = 0; g[row][col]; col++){
 			if(g[row][col] == '*'){
 				BOX[row][col] = '*';
@@ -249,6 +250,12 @@ WINDOW *draw_game_map(char *g[], MAPELE *mele)
 				mvwprintw(map_win, row, col, "%c", mele->empty_p);
 			}
 		}
+		for(i = col; i < mele->col; i++){
+			BOX[row][i] = ' ';
+			NIL_BOX[row][i] = ' ';
+		}
+		BOX[row][mele->col] = '\0';
+		NIL_BOX[row][mele->col] = '\0';
 		row++;
 	}
 	wrefresh(map_win);
