@@ -14,15 +14,9 @@ Hashele *hashtable[HASH_SIZE];
 int dist[MAPSIZE][MAPSIZE][BOXCOUNT];
 LL mark[2][MAPSIZE][MAPSIZE];
 Coor nil_bps[100];
+
 int gr[] = {-1, 1, 0, 0};
 int gc[] = {0, 0, -1, 1};
-int m[BOXCOUNT][BOXCOUNT];
-int lx[BOXCOUNT];
-int ly[BOXCOUNT];
-int vx[BOXCOUNT];
-int vy[BOXCOUNT];
-int slack[BOXCOUNT];
-int mylink[BOXCOUNT];
 
 MAPELE *mele;
 WINDOW *cur_win;
@@ -153,92 +147,91 @@ int go_there(State *st, Coor *beg, Coor *end, int flag)
 	return -1;
 }
 
-int dfs(int u)  
+int dfs(int u, int **arr, int m[][BOXCOUNT])
 {  
 	int v;
-	vx[u] = 1;
-    for(v = 0; v < mele->box_count; v++){  
-		if(!vy[v]){
-			int t = lx[u] + ly[v] - m[u][v];
+	int box_count = mele->box_count;
+	arr[2][u] = 1;
+    for(v = 0; v < box_count; v++){  
+		if(!arr[3][v]){
+			int t = arr[0][u] + arr[1][v] - m[u][v];
 			if(!t){
-				vy[v] = 1;
-				if(mylink[v] == -1 || dfs(mylink[v])){  
-					mylink[v] = u;  
+				arr[3][v] = 1;
+				if(arr[5][v] == -1 || dfs(arr[5][v], arr, m)){  
+					arr[5][v] = u;  
 					return 1;  
 				}  
 			}
 			else
-				if(t < slack[v])
-					slack[v] = t;
+				if(t < arr[4][v])
+					arr[4][v] = t;
 		}
     }  
     return 0;  
 }  
 
-int km()
+int H(State *st)
 {
-	
+	int m[BOXCOUNT][BOXCOUNT];
+	int lx[BOXCOUNT];
+	int ly[BOXCOUNT];
+	int vx[BOXCOUNT];
+	int vy[BOXCOUNT];
+	int slack[BOXCOUNT];
+	int mylink[BOXCOUNT];
+	int *arr[6];
 	int i, j;
-	int ans = 0;
-	int bcout = mele->box_count;
+	int bcount = mele->box_count;
+	int dis = 0;
+	arr[0] = lx;
+	arr[1] = ly;
+	arr[2] = vx;
+	arr[3] = vy;
+	arr[4] = slack;
+	arr[5] = mylink;
 	memset(mylink, -1, sizeof(mylink));
-	for(i = 0; i < bcout; i++){
+	memset(ly, 0, sizeof(ly));
+	for(i = 0; i < bcount; i++){
+		lx[i] = -inf;
+	}
+	for(i = 0; i < bcount; i++){
+		Coor beg;
+		beg.r = st->bcoor[i].r;
+		beg.c = st->bcoor[i].c;
+		for(j = 0; j < bcount; j++){
+			m[i][j] = -dist[beg.r][beg.c][j];
+			if(m[i][j] > lx[i])
+				lx[i] = m[i][j];
+		}
+	}
+
+	for(i = 0; i < bcount; i++){
 		while(1){
 			int d = inf;
-			for(j = 0; j < bcout; j++){
+			for(j = 0; j < bcount; j++){
 				slack[j] = inf;
 			}
 			memset(vx, 0, sizeof(vx));
 			memset(vy, 0, sizeof(vy));
-			if(dfs(i))
+			if(dfs(i, arr, m))
 				break;
-			for(j = 0; j < bcout; j++){
+			for(j = 0; j < bcount; j++){
 				if(!vy[j] && slack[j] < d)
 					d = slack[j];
 			}
-			for(j = 0; j < bcout; j++){
+			for(j = 0; j < bcount; j++){
 				if(vx[j])
 					lx[j] -= d;
 			}
-			for(j = 0; j < bcout; j++){
+			for(j = 0; j < bcount; j++){
 				if(vy[j])
 					ly[j] += d;
-				else 
-					slack[j] -= d;
 			}
 		}
 	}
-	for(i = 0; i < bcout; i++)
-		ans += m[mylink[i]][i];
-	return ans;
-}
-
-int H(State *st)
-{
-	int cnt1, cnt2;
-	int dis = 0;
-	memset(ly, 0, sizeof(ly));
-	for(cnt1 = 0; cnt1 < mele->box_count; cnt1++){
-		lx[cnt1] = -inf;
-	}
-	for(cnt1 = 0; cnt1 < mele->box_count; cnt1++){
-		Coor beg;
-		beg.r = st->bcoor[cnt1].r;
-		beg.c = st->bcoor[cnt1].c;
-		for(cnt2 = 0; cnt2 < mele->box_count; cnt2++){
-			Coor end;
-			end.r = nil_bps[cnt2].r;
-			end.c = nil_bps[cnt2].c;
-#if 0
-			m[cnt1][cnt2] = -go_there(st, &beg, &end, 0);
-#endif
-			m[cnt1][cnt2] = -dist[beg.r][beg.c][cnt2];
-			if(m[cnt1][cnt2] > lx[cnt1])
-				lx[cnt1] = m[cnt1][cnt2];
-		}
-	}
-	dis = -km(st);
-	return dis;
+	for(i = 0; i < bcount; i++)
+		dis += m[mylink[i]][i];
+	return -dis;
 }
 
 int H1(State *st)
@@ -278,18 +271,22 @@ State *new_state(char g[][MAPSIZE])
 {
 	int r, c, u = 0;
 	int cnt;
+	int row = mele->row;;
+	int col = mele->col;;
+	char box_g = mele->box_g;
+	char man_g = mele->man_g;
 	State *st = (State *)malloc(sizeof(State));
 	st->mark_val = 0;
-	for(r = 0; r < mele->row; r++){
-		for(c = 0; c < mele->col; c++){
+	for(r = 0; r < row; r++){
+		for(c = 0; c < col; c++){
 			st->m[r][c] = g[r][c];
-			if(g[r][c] == mele->box_g){
+			if(g[r][c] == box_g){
 				(st->mark_val) ^= mark[0][r][c];
 				st->bcoor[u].r = r;
 				st->bcoor[u].c = c;
 				u++;
 			}
-			if(g[r][c] == mele->man_g){
+			if(g[r][c] == man_g){
 				st->man_r = r;
 				st->man_c = c;
 			}
@@ -607,12 +604,15 @@ void cal_check(State *st, int check[][MAPSIZE])
 	int row = mele->row;
 	int col = mele->col;
 	int num = 0;
+	char wall_g = mele->wall_g;
+	char box_g = mele->box_g;
 	for(r = 0; r < row; r++){
 		for(c = 0; c < col; c++){
-			if(st->m[r][c] == mele->empty_g && !check[r][c]){
+			if(st->m[r][c] != box_g && st->m[r][c] != wall_g && !check[r][c]){
 				int front = 0, rear = 1;
 				int node = r * col + c;
 				num++;
+				check[r][c] = num;
 				mque[front] = node;
 				while(front < rear){
 					int cur = mque[front++];
@@ -624,7 +624,7 @@ void cal_check(State *st, int check[][MAPSIZE])
 						int nc = cc + gc[i];
 						if(nr < 0 || nr >= row || nc < 0 || nc >= col)
 							continue;
-						if(st->m[nr][nc] != mele->wall_g && st->m[nr][nc] != mele->box_g && !check[nr][nc]){
+						if(st->m[nr][nc] != wall_g && st->m[nr][nc] != box_g && !check[nr][nc]){
 							check[nr][nc] = num;
 							mque[rear++] = nr * col + nc;
 						}
