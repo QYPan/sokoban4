@@ -3,7 +3,7 @@
 
 #include "action.h"
 #include <curses.h>
-#define HASH_SIZE 2379689
+#define HASH_SIZE (1<<23)
 #define BOXCOUNT 50
 #define MAX(x, y) ((x)>(y)?(x):(y))
 #define MIN(x, y) ((x)<(y)?(x):(y))

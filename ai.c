@@ -342,14 +342,6 @@ State *get_end_state()
 	return end_st;
 }
 
-void clear_sub_hash(Hashele *ht)
-{
-	if(ht == NULL)
-		return;
-	clear_sub_hash(ht->next);
-	free(ht);
-}
-
 void init_hash()
 {
 	int i;
@@ -363,7 +355,13 @@ void clear_hash()
 	int i;
 	for(i = 0; i < HASH_SIZE; i++){
 		if(hashtable[i] != NULL){
-			clear_sub_hash(hashtable[i]);
+			Hashele *next, *cur;
+			cur = hashtable[i];
+			while(cur){
+				next = cur->next;
+				free(cur);
+				cur = next;
+			}
 			hashtable[i] = NULL;
 		}
 	}
@@ -385,7 +383,7 @@ void init_tools()
 
 int get_hashval(State *st)
 {
-	return (st->mark_val) % HASH_SIZE;
+	return (st->mark_val)&(HASH_SIZE-1);
 #if 0
 	char str[300]; /* !!! */
 	str[0] = '\0';
