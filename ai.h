@@ -28,8 +28,8 @@ typedef struct STATE{
 	Coor bcoor[BOXCOUNT];
 	int man_r, man_c;
 	int d1, d2;
-	int bnum;
-	int f, g, h, move; 
+	int mlen;
+	int f, g, h, move;
 	int next_count;
 	struct STATE *next[BOXCOUNT<<2];
 	struct STATE *fa;
