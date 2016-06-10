@@ -17,7 +17,7 @@ typedef struct{
 
 typedef struct HASHELE{
 	LL key;
-	int step;
+	int step, mlen;
 	int mr, mc;
 	struct HASHELE *next;
 }Hashele;

@@ -442,6 +442,7 @@ int try_match(Hashele *ht, State *st, int check[][MAPSIZE])
 		if(htmp->key == st->mark_val && check[htmp->mr][htmp->mc] != -1){
 			if(st->g < htmp->step){
 				htmp->step = st->g;
+				htmp->mlen = st->mlen;
 				htmp->mr = st->man_r;
 				htmp->mc = st->man_c;
 				co.state_count--;
@@ -461,6 +462,7 @@ int try_match(Hashele *ht, State *st, int check[][MAPSIZE])
 	new_ht = (Hashele *)malloc(sizeof(Hashele));
 	new_ht->key = st->mark_val;
 	new_ht->step = st->g;
+	new_ht->mlen = st->mlen;
 	new_ht->mr = st->man_r;
 	new_ht->mc = st->man_c;
 	new_ht->next = NULL;
@@ -480,6 +482,7 @@ int find_hash(State *st, int val, int check[][MAPSIZE])
 	Hashele *new_ele = (Hashele *)malloc(sizeof(Hashele));
 	new_ele->key = st->mark_val;
 	new_ele->step = st->g;
+	new_ele->mlen = st->mlen;
 	new_ele->mr = st->man_r;
 	new_ele->mc = st->man_c;
 	new_ele->next = NULL;
