@@ -3,7 +3,7 @@
 
 #include "action.h"
 #include <curses.h>
-#define HASH_SIZE (1<<23)
+#define HASH_SIZE (1<<22)
 #define BOXCOUNT 50
 #define MAX(x, y) ((x)>(y)?(x):(y))
 #define MIN(x, y) ((x)<(y)?(x):(y))
@@ -17,7 +17,7 @@ typedef struct{
 
 typedef struct HASHELE{
 	LL key;
-	int step, mlen;
+	int step;
 	int mr, mc;
 	struct HASHELE *next;
 }Hashele;

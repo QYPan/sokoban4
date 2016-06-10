@@ -3,7 +3,7 @@
 #include "ai.h"
 
 #define JBW(r, c) \
-	(tbox[r][c] == mele->box_g || tbox[r][c] == mele->wall_g)
+	(tbox[r][c] == mele->box_g || NIL_BOX[r][c] == mele->wall_g)
 #define JUDGE(r, c) \
 	(r >= 0 && r < mele->row && c >= 0 && c < mele->col)
 
@@ -58,7 +58,7 @@ int judge_kill1(char tbox[][MAPSIZE], int br, int bc)
 			Stack[top++] = dir;
 			while(top){
 				Ncoor d = Stack[top-1];
-				if(tbox[d.r][d.c] == mele->wall_g){
+				if(NIL_BOX[d.r][d.c] == mele->wall_g){
 					if(d.boxcount != d.fillcount){
 						fill[k] = 0;
 					}
@@ -143,7 +143,7 @@ int judge_kill2(char tbox[][MAPSIZE], int br, int bc, int d1, int d2)
 		fcount++;
 	lwr = br + d1;
 	lwc = bc + d2;
-	if(tbox[lwr][lwc] != mele->wall_g)
+	if(NIL_BOX[lwr][lwc] != mele->wall_g)
 		return 0;
 	if(d1){ d3 = 0; d4 = 1;} /* 竖向推 */
 	else { d3 = 1; d4 = 0;} /* 横向推 */
@@ -159,13 +159,13 @@ int judge_kill2(char tbox[][MAPSIZE], int br, int bc, int d1, int d2)
 			int tc = twc - d2;
 			tr = tr + d3*mul;
 			tc = tc + d4*mul;
-			if(tbox[tr][tc] == mele->wall_g){
+			if(NIL_BOX[tr][tc] == mele->wall_g){
 				ok[time] = 1;
 				break;
 			}
 			twr = tr + d1;
 			twc = tc + d2;
-			if(tbox[twr][twc] != mele->wall_g){
+			if(NIL_BOX[twr][twc] != mele->wall_g){
 				break;
 			}
 			if(tbox[tr][tc] == mele->box_g){
