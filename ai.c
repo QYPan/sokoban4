@@ -660,7 +660,7 @@ State *DFS(State *cur_st, State *end_st, int depth, int *minf)
 		return NULL;
 	}
 
-	if(co.state_count == 2000000) /* 限制结点数 */
+	if(co.state_count >= 2000000) /* 限制结点数 */
 		return NULL;
 
 	memset(check, -1, sizeof(check));
