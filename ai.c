@@ -104,24 +104,30 @@ int state_cmp(const void *_s1, const void *_s2)
 {
 	State **s1 = (State **)_s1;
 	State **s2 = (State **)_s2;
-	if((*s1)->f != (*s2)->f)
-		return (*s1)->f - (*s2)->f;
-	return (*s1)->mlen - (*s2)->mlen;
+	if((*s1)->mlen != (*s2)->mlen)
+		return (*s1)->mlen - (*s2)->mlen;
+	return (*s1)->f - (*s2)->f;
 }
 
-void go_there(State *st, int len[][MAPSIZE])
+void go_there(State *st, int *v, int check[][MAPSIZE])
 {
 	int mque[10000];
 	int vis[MAPSIZE*MAPSIZE];
 	int f = 0, r = 1;
-	int i;
+	int i, j;
 	int col = mele->col;
 	int mr = st->man_r;
 	int mc = st->man_c;
+	for(i = 0; i < mele->row; i++)
+		v[i] = 0;
+	for(i = 0; i < mele->row; i++)
+		for(j = 0; j < mele->col; j++)
+			check[i][j] = -1;
 	memset(vis, 0, sizeof(vis));
 	mque[f] = mr * col + mc;
 	vis[mque[f]] = 1;
-	len[mr][mc] = 0;
+	check[mr][mc] = 0;
+	v[mr] |= (1<<mc);
 	while(f < r){
 		int p = mque[f++];
 		int jr = p / col;
@@ -132,7 +138,8 @@ void go_there(State *st, int len[][MAPSIZE])
 			int np = nr * col + nc;
 			if(NIL_BOX[nr][nc] != mele->wall_g && st->m[nr][nc] != mele->box_g && !vis[np]){
 				vis[np] = 1;
-				len[nr][nc] = len[jr][jc] + 1;
+				v[nr] |= (1<<nc);
+				check[nr][nc] = check[jr][jc] + 1;
 				mque[r++] = np;
 			}
 		}
@@ -340,8 +347,6 @@ State *new_state(State *old_st, int cnt, int d1, int d2)
 	for(i = 0; i < mele->box_count; i++)
 		st->m[st->bcoor[i].r][st->bcoor[i].c] = mele->box_g;
 
-	st->h = H(st->bcoor);
-	st->f = st->g + st->h;
 	st->next_count = 0;
 	return st;
 }
@@ -429,6 +434,7 @@ void init_tools()
 	init_hash();
 	init_time();
 	build_zobrist_board();
+	co.state_limit = 6000000;
 	co.state_count = 0;
 	co.hit_count = 0;
 	co.hash_count = 0;
@@ -438,46 +444,43 @@ void init_tools()
 	co.sac = 0;
 }
 
-int get_hashval(State *st)
+int check_hash(State *st)
 {
-	return (st->mark_val)&(HASH_SIZE-1);
-#if 0
-	char str[300]; /* !!! */
-	str[0] = '\0';
-	get_string(st, str);
-	return ELF_Hash(str, strlen(str));
-#endif
-#if 0
-	int val = 0;
-	int i;
-	int row = mele->row;
-	for(i = 0; i < row; i++){
-		int num = st->r[i];
-		if(num)
-			val = (107 * (val^num)) % HASH_SIZE;
-		else 
-			val = (107 * (val^hele[i])) % HASH_SIZE;
+	int hval = ((st->mark_val)&(HASH_SIZE-1));
+	if(hashtable[hval] != NULL){
+		Hashele *ht = hashtable[hval];
+		while(1){
+			if(ht->key == st->mark_val && (ht->vis[st->man_r] & (1<<(st->man_c)))){
+				if(st->g < ht->g){
+					return 0;
+				}
+				return 1;
+			}
+			if(ht->next == NULL)
+				break;
+			ht = ht->next;
+		}
 	}
-	return val;
-#endif
+	return 0;
 }
 
-int try_match(Hashele *ht, State *st, int check[][MAPSIZE])
+Hashele *try_match(Hashele *ht, State *st, int check[][MAPSIZE])
 {
 	Hashele *htmp = ht, *new_ht;
 	int c = 0;
 	int mat = 0;
 	while(1){
-		if(htmp->key == st->mark_val && check[htmp->mr][htmp->mc] != -1){
-			if(st->g < htmp->step){
-				htmp->step = st->g;
+		if(htmp->key == st->mark_val && (htmp->vis[st->man_r] & (1<<(st->man_c)))){
+			if(st->g < htmp->g){
+				htmp->g = st->g;
 				htmp->mr = st->man_r;
 				htmp->mc = st->man_c;
 				co.state_count--;
-				return -1;
+				go_there(st, htmp->vis, check);
+				return htmp;
 			}
 			co.same_count++;
-			return htmp->step;
+			return NULL;
 		}
 		if(htmp->key != st->mark_val)
 			mat = 1;
@@ -488,8 +491,9 @@ int try_match(Hashele *ht, State *st, int check[][MAPSIZE])
 		htmp = htmp->next;
 	}
 	new_ht = (Hashele *)malloc(sizeof(Hashele));
+	go_there(st, new_ht->vis, check);
 	new_ht->key = st->mark_val;
-	new_ht->step = st->g;
+	new_ht->g = st->g;
 	new_ht->mr = st->man_r;
 	new_ht->mc = st->man_c;
 	new_ht->next = NULL;
@@ -497,30 +501,31 @@ int try_match(Hashele *ht, State *st, int check[][MAPSIZE])
 
 	if(mat) co.hit_count++;
 	if(c > co.sac) co.sac = c;
-	return -1;
+	return new_ht;
 }
 
-int find_hash(State *st, int val, int check[][MAPSIZE])
+Hashele *find_hash(State *st, int val, int check[][MAPSIZE])
 {
 	int ins = val;
 	if(hashtable[ins] != NULL){
 		return try_match(hashtable[ins], st, check);
 	}
 	Hashele *new_ele = (Hashele *)malloc(sizeof(Hashele));
+	go_there(st, new_ele->vis, check);
 	new_ele->key = st->mark_val;
-	new_ele->step = st->g;
+	new_ele->g = st->g;
 	new_ele->mr = st->man_r;
 	new_ele->mc = st->man_c;
 	new_ele->next = NULL;
 
 	hashtable[ins] = new_ele;
 	co.hash_count++;
-	return -1;
+	return new_ele;
 }
 
-int try_insert(State *st, int check[][MAPSIZE])
+Hashele *try_insert(State *st, int check[][MAPSIZE])
 {
-	int hashvalue = get_hashval(st);
+	int hashvalue = ((st->mark_val)&(HASH_SIZE-1));
 	return find_hash(st, hashvalue, check);
 }
 
@@ -533,11 +538,11 @@ State *go_next(State *fa, int cnt, int d1, int d2)
 	fa->m[br][bc] = '\0';
 	fa->m[br+d1][bc+d2] = mele->box_g;
 	ki = kill(fa->m, br+d1, bc+d2, d1, d2);
+	fa->m[br][bc] = mele->box_g;
+	fa->m[br+d1][bc+d2] = '\0';
 	if(!ki){ /* 不产生死锁 */
 		p = new_state(fa, cnt, d1, d2);
 	}
-	fa->m[br][bc] = mele->box_g;
-	fa->m[br+d1][bc+d2] = '\0';
 	return p;
 }
 
@@ -647,27 +652,13 @@ State *DFS(State *cur_st, State *end_st, int depth, int *minf)
 {
 	int check[MAPSIZE][MAPSIZE];
 	int cnt;
-	int step;
+	Hashele *he;
 
-	if(cur_st->mark_val == end_st->mark_val){
+	if(co.state_count >= co.state_limit) /* 限制结点数 */
 		return cur_st;
-	}
 
-	if(cur_st->f > depth){
-		if(cur_st->f < (*minf)){
-			*minf = cur_st->f;
-		}
-		return NULL;
-	}
-
-	if(co.state_count >= 2000000) /* 限制结点数 */
-		return NULL;
-
-	memset(check, -1, sizeof(check));
-	go_there(cur_st, check); /* 预处理人所能到达到位置 */
-
-	step = try_insert(cur_st, check);
-	if(step != -1){ /* 此状态已搜索过 */
+	he = try_insert(cur_st, check);
+	if(he == NULL){
 		return NULL;
 	}
 
@@ -696,7 +687,24 @@ State *DFS(State *cur_st, State *end_st, int depth, int *minf)
 			if(st != NULL){
 				st->mlen = len;
 				st->move = cur_st->move + len + 1;
-				cur_st->next[cur_st->next_count++] = st;
+				if(!check_hash(st)){
+					st->h = H(st->bcoor);
+					st->f = st->g + st->h;
+					if(st->f > depth){
+						if(st->f < (*minf)){
+							*minf = st->f;
+						}
+						free(st);
+					}
+					else{
+						cur_st->next[cur_st->next_count++] = st;
+						if(st->mark_val == end_st->mark_val){
+							return st;
+						}
+					}
+				}
+				else
+					free(st);
 			}
 		}
 	}
@@ -744,7 +752,7 @@ void *IDA_star(void *arg)
 	depth = beg_st->h;
 	ans = NULL;
 	minf = inf;
-	while(ans == NULL && co.state_count < 2000000){
+	while(ans == NULL && co.state_count < co.state_limit){
 		clear_hash();
 		co.depth++;
 		co.state_count = 0;

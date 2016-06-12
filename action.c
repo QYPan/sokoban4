@@ -23,7 +23,7 @@ int load_map()
 	int layers = 0;
 	char s[MAPSIZE];
 	FILE *fp;
-	fp = fopen("g.txt", "rt");
+	fp = fopen("g1.txt", "rt");
 	if(fp == NULL){
 		perror("open map file failure!\n");
 		return -1;
