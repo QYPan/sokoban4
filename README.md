@@ -18,8 +18,5 @@ linux 下基于 curses 的 C 语言推箱子自动求解程序
 ### 功能演示
 ![image](https://github.com/QYPan/dynamic_gif/blob/master/sokoban/sokoban.gif)
 
-### 注意
-* 该程序尚未完善，可能无法良好运行，代码风格糟糕，难以重构
-
 ### 相关博客链接
 * http://blog.csdn.net/u013351484/article/details/51598270
